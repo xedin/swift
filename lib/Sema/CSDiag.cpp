@@ -6223,11 +6223,47 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (diagnoseCallContextualConversionErrors(callExpr, CS->getContextualType()))
     return true;
 
-  // Type check the function subexpression to resolve a type for it if
-  // possible.
-  auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
-  if (!fnExpr)
+  auto originalFnType = CS->getType(callExpr->getFn());
+
+  // Check if there is a structural problem in the function expression
+  // itself, by type-checking it allowing unresolved variables. If
+  // that is going to produce a functional type with unresolved result
+  // let's not re-typecheck the function expression, because it might
+  // produce unrelated diagnostics due to lack of contextual information.
+  auto shouldTypeCheckFunction = [&](Expr *fnExpr) -> bool {
+    if (!isa<UnresolvedDotExpr>(fnExpr))
+      return true;
+
+    SmallVector<Type, 4> fnTypes;
+    CS->TC.getPossibleTypesOfExpressionWithoutApplying(
+        fnExpr, CS->DC, fnTypes, FreeTypeVariableBinding::UnresolvedType);
+
+    // Might be a structural problem related to the member itself.
+    if (fnTypes.empty())
+      return true;
+
+    if (fnTypes.size() == 1) {
+      // Some member types depend on the arguments to produce a result type,
+      // type-checking such expressions without associated arguments is
+      // going to produce unrelated diagnostics.
+      if (auto fn = fnTypes[0]->getAs<AnyFunctionType>()) {
+        auto resultType = fn->getResult();
+        if (resultType->hasUnresolvedType() || resultType->hasTypeVariable())
+          return false;
+      }
+    }
+
     return true;
+  };
+
+  auto *fnExpr = callExpr->getFn();
+  if (shouldTypeCheckFunction(fnExpr)) {
+    // Type check the function subexpression to resolve a type for it if
+    // possible.
+    fnExpr = typeCheckChildIndependently(callExpr->getFn());
+    if (!fnExpr)
+      return true;
+  }
 
   SWIFT_DEFER {
     if (!fnExpr) return;
@@ -6245,6 +6281,35 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   };
 
   auto fnType = getFuncType(CS->getType(fnExpr));
+
+  // Let's see if this has to do with member vs. property error
+  // because sometimes when there is a member and a property declared
+  // on the nominal type with the same name type-checking function
+  // expression separately from arguments might produce solution for
+  // the property instead of the member.
+  if (!fnType->is<AnyFunctionType>()) {
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn())) {
+      fnExpr = callExpr->getFn();
+
+      SmallVector<Type, 4> types;
+      CS->TC.getPossibleTypesOfExpressionWithoutApplying(fnExpr, CS->DC, types);
+
+      unsigned numFuncTypes = 0;
+      Type funcType;
+      for (auto type : types) {
+        if (getFuncType(type)->is<AnyFunctionType>()) {
+          funcType = getFuncType(type);
+          numFuncTypes++;
+        }
+      }
+
+      if (numFuncTypes == 1) {
+        fnType = funcType;
+      } else {
+        fnType = originalFnType;
+      }
+    }
+  }
 
   // If we have a contextual type, and if we have an ambiguously typed function
   // result from our previous check, we re-type-check it using this contextual

@@ -310,7 +310,7 @@ class NSObjectable : NSObjectProtocol {
 // Properties with custom accessors
 func customAccessors(_ hive: Hive, bee: Bee) {
   markUsed(hive.isMakingHoney)
-  markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type 'Bool'}}{{28-30=}}
+  markUsed(hive.makingHoney()) // expected-error{{cannot call value of non-function type '@lvalue Bool'}}{{28-30=}}
   hive.setMakingHoney(true) // expected-error{{value of type 'Hive' has no member 'setMakingHoney'}}
 
   _ = (hive.`guard` as AnyObject).description // okay
@@ -492,7 +492,7 @@ class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-e
 
 func testNullarySelectorPieces(_ obj: AnyObject) {
   obj.foo(1, bar: 2, 3) // no-warning
-  obj.foo(1, 2, bar: 3) // expected-error{{cannot call value of non-function type 'Any?!'}}
+  obj.foo(1, 2, bar: 3) // expected-error{{cannot invoke 'foo' with an argument list of type '(Int, Int, bar: Int)'}}
 }
 
 func testFactoryMethodAvailability() {
