@@ -1455,6 +1455,8 @@ public:
     /// Constraint graph scope associated with this solver scope.
     ConstraintGraphScope CGScope;
 
+    llvm::SmallVector<Constraint *, 4> FavoredChoices;
+
     SolverScope(const SolverScope &) = delete;
     SolverScope &operator=(const SolverScope &) = delete;
 
@@ -3377,11 +3379,6 @@ public:
 
   operator Constraint *() { return Choice; }
 
-private:
-  /// \brief If associated disjunction is an explicit conversion,
-  /// let's try to propagate its type early to prune search space.
-  void propagateConversionInfo() const;
-
   ValueDecl *getOperatorDecl() const {
     auto *decl = getDecl(Choice);
     if (!decl)
@@ -3389,6 +3386,11 @@ private:
 
     return decl->isOperator() ? decl : nullptr;
   }
+
+private:
+  /// \brief If associated disjunction is an explicit conversion,
+  /// let's try to propagate its type early to prune search space.
+  void propagateConversionInfo() const;
 
   static ValueDecl *getDecl(Constraint *constraint) {
     if (constraint->getKind() != ConstraintKind::BindOverload)
