@@ -1882,12 +1882,22 @@ bool ConstraintSystem::solveForDisjunctionChoices(
     ArrayRef<Constraint *> constraints, ConstraintLocator *disjunctionLocator,
     SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables, bool explicitConversion) {
-  Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
+  llvm::SmallVector<Constraint *, 8> choices;
+  choices.reserve(constraints.size());
+  for (auto *choice : constraints) {
+    if (!choice->isDisabled())
+      choices.push_back(choice);
+  }
 
+  // Always keep "favored" choices at the top of the list.
+  std::sort(choices.begin(), choices.end(),
+            [](Constraint *a, Constraint *b) { return a->isFavored(); });
+
+  Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
   // Try each of the constraints within the disjunction.
-  for (auto index : indices(constraints)) {
+  for (auto index : indices(choices)) {
     auto currentChoice =
-        DisjunctionChoice(this, constraints[index], explicitConversion);
+        DisjunctionChoice(this, choices[index], explicitConversion);
 
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
