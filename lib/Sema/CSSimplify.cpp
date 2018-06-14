@@ -710,7 +710,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
     // callee is a function-typed property or an enum constructor whose
     // argument is a single unlabeled type parameter.
     if (auto *prop = dyn_cast<VarDecl>(callee)) {
-      auto *fnType = prop->getInterfaceType()->getAs<AnyFunctionType>();
+      auto *fnType = cs.getType(prop)->getAs<AnyFunctionType>();
       if (fnType && fnType->getInput()->isTypeParameter())
         argType = ParenType::get(cs.getASTContext(), argType);
     } else if (auto *enumCtor = dyn_cast<EnumElementDecl>(callee)) {

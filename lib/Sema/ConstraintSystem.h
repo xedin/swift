@@ -1641,6 +1641,11 @@ public:
     return TypeLocTypes.find(&L)->second;
   }
 
+  Type getType(const VarDecl *D, bool wantInterfaceType = true) const {
+    assert(D->hasValidSignature());
+    return wantInterfaceType ? D->getInterfaceType() : D->getType();
+  }
+
   /// Cache the type of the expression argument and return that same
   /// argument.
   template <typename T>
@@ -2210,6 +2215,21 @@ public:
                           DeclContext *useDC,
                           const DeclRefExpr *base = nullptr);
 
+  /// Return the type-of-reference of the given value.
+  ///
+  /// \param baseType if non-null, return the type of a member reference to
+  ///   this value when the base has the given type
+  ///
+  /// \param UseDC The context of the access.  Some variables have different
+  ///   types depending on where they are used.
+  ///
+  /// \param base The optional base expression of this value reference
+  ///
+  /// \param wantInterfaceType Whether we want the interface type, if available.
+  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                  DeclContext *UseDC,
+                                  const DeclRefExpr *base = nullptr,
+                                  bool wantInterfaceType = false);
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
   ///
