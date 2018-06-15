@@ -962,6 +962,7 @@ private:
   /// the types on the expression nodes.
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
   llvm::DenseMap<const TypeLoc *, TypeBase *> TypeLocTypes;
+  llvm::DenseMap<const ParamDecl *, TypeBase *> ParamTypes;
 
   /// Maps closure parameters to type variables.
   llvm::DenseMap<const ParamDecl *, TypeVariableType *>
@@ -1616,6 +1617,12 @@ public:
     TypeLocTypes[&L] = T.getPointer();
   }
 
+  void setType(ParamDecl *P, Type T) {
+    assert(P && "Expected non-null parameter!");
+    assert(T && "Expected non-null type!");
+    ParamTypes[P] = T.getPointer();
+  }
+
   /// Check to see if we have a type for an expression.
   bool hasType(const Expr *E) const {
     assert(E != nullptr && "Expected non-null expression!");
@@ -1624,6 +1631,11 @@ public:
 
   bool hasType(const TypeLoc &L) const {
     return TypeLocTypes.find(&L) != TypeLocTypes.end();
+  }
+
+  bool hasType(const ParamDecl *P) const {
+    assert(P != nullptr && "Expected non-null parameter!");
+    return ParamTypes.find(P) != ParamTypes.end();
   }
 
   /// Get the type for an expression.
@@ -1642,6 +1654,11 @@ public:
   }
 
   Type getType(const VarDecl *D, bool wantInterfaceType = true) const {
+    if (auto *PD = dyn_cast<ParamDecl>(D)) {
+      assert(hasType(PD) && "Expected type to have been set!");
+      return ParamTypes.find(PD)->second;
+    }
+
     assert(D->hasValidSignature());
     return wantInterfaceType ? D->getInterfaceType() : D->getType();
   }

@@ -1345,15 +1345,6 @@ namespace {
       }
 
       auto locator = CS.getConstraintLocator(E);
-      
-      // Create an overload choice referencing this declaration and immediately
-      // resolve it. This records the overload for use later.
-      auto tv = CS.createTypeVariable(locator,
-                                      TVO_CanBindToLValue);
-
-      OverloadChoice choice =
-          OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());
-      CS.resolveOverload(locator, tv, choice, CurDC);
 
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         if (VD->getInterfaceType() &&
@@ -1363,9 +1354,21 @@ namespace {
           auto type = VD->getInterfaceType();
           if (type->hasTypeParameter())
             type = VD->getDeclContext()->mapTypeIntoContext(type);
+
+          if (auto *PD = dyn_cast<ParamDecl>(VD))
+            CS.setType(PD, type);
+
           CS.setFavoredType(E, type.getPointer());
         }
       }
+
+      // Create an overload choice referencing this declaration and immediately
+      // resolve it. This records the overload for use later.
+      auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
+
+      OverloadChoice choice =
+          OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());
+      CS.resolveOverload(locator, tv, choice, CurDC);
 
       return tv;
     }
@@ -1985,6 +1988,7 @@ namespace {
           assert(!param->isImmutable() || !openedType->is<InOutType>());
           param->setType(openedType->getInOutObjectType());
           param->setInterfaceType(openedType->getInOutObjectType());
+          CS.setType(param, openedType->getInOutObjectType());
           continue;
         }
 
@@ -1993,6 +1997,7 @@ namespace {
 
         param->setType(ty);
         param->setInterfaceType(ty);
+        CS.setType(param, ty);
       }
       
       return params->getType(CS.getASTContext());
