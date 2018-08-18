@@ -2014,50 +2014,6 @@ bool ConstraintSystem::solveForDisjunction(
   auto afterDisjunction = InactiveConstraints.erase(disjunction);
   CG.removeConstraint(disjunction);
 
-  // Check if selected disjunction has a representative
-  // this might happen when there are multiple binary operators
-  // chained together. If so, disable choices which differ
-  // from currently selected representative.
-  auto pruneOverloadSet = [&](Constraint *disjunction) -> bool {
-    auto *choice = disjunction->getNestedConstraints().front();
-    auto *typeVar = choice->getFirstType()->getAs<TypeVariableType>();
-    if (!typeVar)
-      return false;
-
-    auto *repr = typeVar->getImpl().getRepresentative(nullptr);
-    if (!repr || repr == typeVar)
-      return false;
-
-    bool isPruned = false;
-    for (auto resolved = resolvedOverloadSets; resolved;
-         resolved = resolved->Previous) {
-      if (!resolved->BoundType->isEqual(repr))
-        continue;
-
-      auto &representative = resolved->Choice;
-      if (!representative.isDecl())
-        return false;
-
-      // Disable all of the overload choices which are different from
-      // the one which is currently picked for representative.
-      for (auto *constraint : disjunction->getNestedConstraints()) {
-        auto choice = constraint->getOverloadChoice();
-        if (!choice.isDecl())
-          continue;
-
-        if (choice.getDecl() != representative.getDecl()) {
-          constraint->setDisabled();
-          isPruned = true;
-        }
-      }
-      break;
-    }
-
-    return isPruned;
-  };
-
-  bool hasDisabledChoices = pruneOverloadSet(disjunction);
-
   ++solverState->NumDisjunctions;
   auto *locator =
       disjunction->shouldRememberChoice() ? disjunction->getLocator() : nullptr;
@@ -2066,14 +2022,6 @@ bool ConstraintSystem::solveForDisjunction(
   auto noSolutions = solveForDisjunctionChoices(
       disjunction->getNestedConstraints(), locator, solutions,
       allowFreeTypeVariables, isExplicitConversionConstraint(disjunction));
-
-  if (hasDisabledChoices) {
-    // Re-enable previously disabled overload choices.
-    for (auto *choice : disjunction->getNestedConstraints()) {
-      if (choice->isDisabled())
-        choice->setEnabled();
-    }
-  }
 
   // Put the disjunction constraint back in its place.
   InactiveConstraints.insert(afterDisjunction, disjunction);
