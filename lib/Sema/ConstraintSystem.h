@@ -3371,18 +3371,6 @@ public:
 
   bool isDisabled() const { return Choice->isDisabled(); }
 
-  bool isUnavailable() const {
-    if (auto *decl = getDecl(Choice))
-      return decl->getAttrs().isUnavailable(decl->getASTContext());
-    return false;
-  }
-
-  // FIXME: Both of the accessors below are required to support
-  //        performance optimization hacks in constraint solver.
-
-  bool isGenericOperator() const;
-  bool isSymmetricOperator() const;
-
   /// \brief Apply given choice to the system and try to solve it.
   Optional<Score> solve(SmallVectorImpl<Solution> &solutions,
                         FreeTypeVariableBinding allowFreeTypeVariables);

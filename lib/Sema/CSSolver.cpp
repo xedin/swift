@@ -1796,53 +1796,6 @@ void ConstraintSystem::collectDisjunctions(
   }
 }
 
-/// \brief Check if the given disjunction choice should be attempted by solver.
-static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
-                                        DisjunctionChoice &choice,
-                                        Optional<Score> &bestNonGenericScore) {
-  if (choice->isDisabled()) {
-    auto &TC = cs.TC;
-    if (TC.getLangOpts().DebugConstraintSolver) {
-      auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
-      log.indent(cs.solverState->depth)
-      << "(skipping ";
-      choice->print(log, &TC.Context.SourceMgr);
-      log << '\n';
-    }
-
-    return true;
-  }
-
-  // Skip unavailable overloads unless solver is in the "diagnostic" mode.
-  if (!cs.shouldAttemptFixes() && choice.isUnavailable())
-    return true;
-
-  if (cs.TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
-    return false;
-
-  // Don't attempt to solve for generic operators if we already have
-  // a non-generic solution.
-
-  // FIXME: Less-horrible but still horrible hack to attempt to
-  //        speed things up. Skip the generic operators if we
-  //        already have a solution involving non-generic operators,
-  //        but continue looking for a better non-generic operator
-  //        solution.
-  if (bestNonGenericScore && choice.isGenericOperator()) {
-    auto &score = bestNonGenericScore->Data;
-    // Let's skip generic overload choices only in case if
-    // non-generic score indicates that there were no forced
-    // unwrappings of optional(s), no unavailable overload
-    // choices present in the solution, no fixes required,
-    // and there are no non-trivial function conversions.
-    if (score[SK_ForceUnchecked] == 0 && score[SK_Unavailable] == 0 &&
-        score[SK_Fix] == 0 && score[SK_FunctionConversion] == 0)
-      return true;
-  }
-
-  return false;
-}
-
 // Attempt to find a disjunction of bind constraints where all options
 // in the disjunction are binding the same type variable.
 //
@@ -1929,15 +1882,12 @@ bool ConstraintSystem::solveForDisjunctionChoices(
     ArrayRef<Constraint *> constraints, ConstraintLocator *disjunctionLocator,
     SmallVectorImpl<Solution> &solutions,
     FreeTypeVariableBinding allowFreeTypeVariables, bool explicitConversion) {
-  Optional<Score> bestNonGenericScore;
   Optional<std::pair<DisjunctionChoice, Score>> lastSolvedChoice;
 
   // Try each of the constraints within the disjunction.
   for (auto index : indices(constraints)) {
     auto currentChoice =
         DisjunctionChoice(this, constraints[index], explicitConversion);
-    if (shouldSkipDisjunctionChoice(*this, currentChoice, bestNonGenericScore))
-      continue;
 
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
@@ -1986,15 +1936,8 @@ bool ConstraintSystem::solveForDisjunctionChoices(
       }
     }
 
-    if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {
-      if (!currentChoice.isGenericOperator() &&
-          currentChoice.isSymmetricOperator()) {
-        if (!bestNonGenericScore || score < bestNonGenericScore)
-          bestNonGenericScore = score;
-      }
-
+    if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables))
       lastSolvedChoice = {currentChoice, *score};
-    }
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
@@ -2113,30 +2056,6 @@ DisjunctionChoice::solve(SmallVectorImpl<Solution> &solutions,
   }
 
   return bestScore;
-}
-
-bool DisjunctionChoice::isGenericOperator() const {
-  auto *decl = getOperatorDecl();
-  if (!decl)
-    return false;
-
-  auto interfaceType = decl->getInterfaceType();
-  return interfaceType->is<GenericFunctionType>();
-}
-
-bool DisjunctionChoice::isSymmetricOperator() const {
-  auto *decl = getOperatorDecl();
-  if (!decl)
-    return false;
-
-  auto func = dyn_cast<FuncDecl>(decl);
-  auto paramList = func->getParameters();
-  if (paramList->size() != 2)
-    return true;
-
-  auto firstType = paramList->get(0)->getInterfaceType();
-  auto secondType = paramList->get(1)->getInterfaceType();
-  return firstType->isEqual(secondType);
 }
 
 void DisjunctionChoice::propagateConversionInfo() const {
