@@ -3101,12 +3101,11 @@ static void simplifyDisjunction(ConstraintSystem &CS, Constraint *disjunction) {
       continue;
 
     auto *decl = choice->getOverloadChoice().getDecl();
-    auto *nominal =
-        decl->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
-    if (!nominal)
+    auto *NTD = decl->getDeclContext()->getSelfNominalTypeDecl();
+    if (!NTD)
       continue;
 
-    auto type = nominal->getDeclaredType();
+    auto type = NTD->getDeclaredType();
     for (auto &req : requirements) {
       auto *requirementChoice = req.first;
       const auto &requirement = req.second;
@@ -3118,7 +3117,7 @@ static void simplifyDisjunction(ConstraintSystem &CS, Constraint *disjunction) {
       // mean that this is a default witness for this requirement,
       // if so, but we have no way to reliably prove that because
       // default witnesses are calculated later.
-      if (nominal == protocol)
+      if (NTD == protocol)
         continue;
 
       ConformanceCheckOptions options;
