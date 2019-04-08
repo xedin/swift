@@ -127,6 +127,8 @@ public:
     ContextualType,
     /// The missing argument synthesized by the solver.
     SynthesizedArgument,
+    /// The expected type of the function with a single expression body.
+    SingleExprFuncResultType,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -157,6 +159,7 @@ public:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
     case ContextualType:
+    case SingleExprFuncResultType:
       return 0;
 
     case OpenedGeneric:
@@ -221,6 +224,7 @@ public:
     case DynamicLookupResult:
     case ContextualType:
     case SynthesizedArgument:
+    case SingleExprFuncResultType:
       return 0;
 
     case FunctionArgument:
