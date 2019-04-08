@@ -147,6 +147,9 @@ enum class ConstraintKind : char {
   /// The first type is a function type, the second is the function's
   /// result type.
   FunctionResult,
+  /// The first type is being implicitly returned from a function, the second is
+  /// the function's result type.
+  SingleExpressionFunctionReturnConversion,
 };
 
 /// Classification of the different kinds of constraints.
@@ -178,6 +181,8 @@ enum class ConversionRestrictionKind {
   DeepEquality,
   /// Subclass-to-superclass conversion.
   Superclass,
+  /// Uninhabited-to-any conversion.
+  UninhabitedUpcast,
   /// Class metatype to AnyObject conversion.
   ClassMetatypeToAnyObject,
   /// Existential metatype to AnyObject conversion.
@@ -485,6 +490,7 @@ public:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
+    case ConstraintKind::SingleExpressionFunctionReturnConversion:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:
