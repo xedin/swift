@@ -242,6 +242,12 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
   case BraceItemListKind::InactiveConditionalBlock:
     return Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
            Tok.isNot(tok::pound_elseif);
+  case BraceItemListKind::BracelessClosure:
+    // This block represents a body of the closure without explicit braces,
+    // it could be used in the argument positions or standalone. It has to
+    // terminate with a comma which separates arguments, or if used at the
+    // end of function call or subscript with `)` or `]` respectively.
+    return Tok.is(tok::comma) || Tok.is(tok::r_paren) || Tok.is(tok::r_square);
   }
 
   llvm_unreachable("Unhandled BraceItemListKind in switch.");

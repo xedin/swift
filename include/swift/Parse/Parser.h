@@ -80,6 +80,8 @@ namespace swift {
     InactiveConditionalBlock,
     /// The body of the active clause of an #if/#else/#endif block
     ActiveConditionalBlock,
+    /// The body of the closure expression which doesn't have enclosing brases.
+    BracelessClosure,
   };
 
 /// The receiver will be fed with consumed tokens while parsing. The main purpose
@@ -1336,22 +1338,31 @@ public:
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 
-  /// Parse a closure expression after the opening brace.
+  /// Parse a closure expression (with or without braces):
   ///
   /// \verbatim
   ///   expr-closure:
   ///     '{' closure-signature? brace-item-list* '}'
+  ///   expr-braceless-closure:
+  ///     closure-signature expr
   ///
   ///   closure-signature:
-  ///     '|' closure-signature-arguments? '|' closure-signature-result?
+  ///     closure-signature-arguments? closure-signature-result?
   ///
   ///   closure-signature-arguments:
-  ///     pattern-tuple-element (',' pattern-tuple-element)*
+  ///     '('? pattern-tuple-element (',' pattern-tuple-element)* ')'?
   ///
   ///   closure-signature-result:
   ///     '->' type
   /// \endverbatim
-  ParserResult<Expr> parseExprClosure();
+  ParserResult<Expr> parseExprClosure(bool hasBraces = true);
+
+  /// Determine whether current token represents a start of
+  /// the valid closure signature.
+  ///
+  /// \param checkParams Make sure that parameters have
+  /// correct/expected format.
+  bool isStartOfValidClosureSignature(bool checkParams = true);
 
   /// Parse the closure signature, if present.
   ///

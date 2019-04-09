@@ -354,3 +354,71 @@ func lvalueCapture<T>(c: GenericClass<T>) {
     cc = wc!
   }
 }
+
+func braceless_closures() {
+  let _: (Int) -> Void = x in print(x)
+  let _: (() -> Void) -> Void = fn in fn()
+  let _: (() -> Void) -> Void = fn in fn in fn()
+  // expected-error@-1 {{single expression closure cannot form a body of another single expression closure}}
+  // expected-error@-2 {{cannot invoke 'fn' with no arguments}}
+  let _: (Int, Int) -> Void = x, y in let z = x + y; print(z)
+  // expected-error@-1 {{expected expression}}
+  let _: (Int, Int) -> Void = x, y in // expected-error {{expected expression}}
+    let z = x + y
+    print(z)
+
+  struct S {
+    subscript(fn: (Int, Int) -> Void) -> Bool { return false }
+    subscript(fn: (Int) -> Void, y y: Int) -> Bool { return false }
+    subscript(fn: (Int) -> Void, y: Float) -> Bool { return false }
+  }
+
+  func foo(_ s: S) {
+    _ = s[x, y in print(x)]
+    _ = s[(x: Int, y: Int) -> Void in let (_, _) = (x, y)]
+    // expected-error@-1 {{expected expression}}
+    _ = s[x in print(x), y: 1 + 2]
+    _ = s[x in _ = x + 1, 42]
+    _ = s[x, y in
+      _ = x + y
+    ]
+    _ = s[x, y in // expected-error {{expected expression}}
+      let _ = x + y
+    ]
+    _ = s[x, y in // expected-error {{expected expression}}
+      let z = x + y
+      print(z)
+    ]
+
+    _ = s[x in
+      print(x),
+      y: 42 // second argument
+    ]
+  }
+
+  func bar(x: Int, _ fn: (Int) -> Void) {}
+  func bar(_ fn: (Int) -> Void, _ x: Int = 42) {}
+
+  bar(x: 42, x in print(x))
+  bar(_ in print("hello"), 0)
+  bar((x: Int) -> Void in _ = x + 1, (0, 42).1)
+  bar((x: Int) -> Void in) // expected-error {{expected expression}}
+  bar((x: Int) -> Void in
+    print(x)
+  )
+  bar((x: Int) -> Void in
+    print(x),
+    42 // second argument
+  )
+
+  for x in y in y.foo() {
+    // expected-error@-1 {{expected '{' to start the body of for-each loop}}
+    // expected-error@-2 {{type 'Int' does not conform to protocol 'Sequence'}}
+  }
+
+  func baz(_ arr: [Int]) {
+    for case (let x) in arr {
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+    }
+  }
+}

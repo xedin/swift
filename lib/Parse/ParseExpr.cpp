@@ -67,7 +67,7 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
     return expr;
   if (expr.isNull())
     return nullptr;
-  
+
   return makeParserResult(expr.get());
 }
 
@@ -1446,6 +1446,22 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 ///
 ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
+
+  if (!isExprBasic) {
+    switch (Tok.getKind()) {
+    case tok::identifier:
+    case tok::kw__:
+    case tok::l_paren:
+    case tok::l_brace:
+      if (isStartOfValidClosureSignature())
+        return parseExprClosure(/*hasBraces=*/false);
+      break;
+
+    default:
+      break;
+    }
+  }
+
   switch (Tok.getKind()) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Tok.getText());
@@ -1531,7 +1547,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     return makeParserResult(new (Context) MagicIdentifierLiteralExpr(
         Kind, Loc, /*implicit=*/false));
   }
-      
+
   case tok::identifier:  // foo
   case tok::kw_self:     // self
 
@@ -2422,11 +2438,72 @@ static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
   OS << ")";
 }
 
-bool Parser::
-parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
-                               ParameterList *&params, SourceLoc &throwsLoc,
-                               SourceLoc &arrowLoc,
-                               TypeRepr *&explicitResultType, SourceLoc &inLoc){
+bool Parser::isStartOfValidClosureSignature(bool checkParams) {
+  if (!Tok.isAny(tok::l_paren, tok::l_square, tok::identifier, tok::kw__))
+    return false;
+
+  Parser::BacktrackingScope backtrack(*this);
+
+  // Skip by a closure capture list if present.
+  if (consumeIf(tok::l_square)) {
+    skipUntil(tok::r_square);
+    if (!consumeIf(tok::r_square))
+      return false;
+  }
+
+  // Parse pattern-tuple func-signature-result? 'in'.
+  if (consumeIf(tok::l_paren)) { // Consume the ')'.
+    // While we don't have '->' or ')', eat balanced tokens.
+    while (!Tok.is(tok::r_paren) && !Tok.is(tok::eof)) {
+      if (checkParams) {
+        // Format of the parameter list is `label ':' Type = defaultValue`
+        if (isStartOfDecl() || isStartOfStmt())
+          return false;
+      }
+
+      skipSingle();
+    }
+
+    // Consume the ')', if it's there.
+    if (consumeIf(tok::r_paren)) {
+      consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
+      // Parse the func-signature-result, if present.
+      if (consumeIf(tok::arrow)) {
+        if (!canParseType())
+          return false;
+      }
+    }
+
+    // Okay, we have a closure signature.
+  } else if (Tok.isIdentifierOrUnderscore()) {
+    // Parse identifier (',' identifier)*
+    consumeToken();
+    while (consumeIf(tok::comma)) {
+      if (Tok.isIdentifierOrUnderscore()) {
+        consumeToken();
+        continue;
+      }
+
+      return false;
+    }
+
+    consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
+
+    // Parse the func-signature-result, if present.
+    if (consumeIf(tok::arrow)) {
+      if (!canParseType())
+        return false;
+    }
+  }
+
+  // Parse the 'in' at the end.
+  return Tok.is(tok::kw_in);
+}
+
+bool Parser::parseClosureSignatureIfPresent(
+    SmallVectorImpl<CaptureListEntry> &captureList, ParameterList *&params,
+    SourceLoc &throwsLoc, SourceLoc &arrowLoc, TypeRepr *&explicitResultType,
+    SourceLoc &inLoc) {
   // Clear out result parameters.
   params = nullptr;
   throwsLoc = SourceLoc();
@@ -2434,66 +2511,11 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
   explicitResultType = nullptr;
   inLoc = SourceLoc();
 
-  // If we have a leading token that may be part of the closure signature, do a
-  // speculative parse to validate it and look for 'in'.
-  if (Tok.isAny(tok::l_paren, tok::l_square, tok::identifier, tok::kw__)) {
-    BacktrackingScope backtrack(*this);
-
-    // Skip by a closure capture list if present.
-    if (consumeIf(tok::l_square)) {
-      skipUntil(tok::r_square);
-      if (!consumeIf(tok::r_square))
-        return false;
-    }
-
-    // Parse pattern-tuple func-signature-result? 'in'.
-    if (consumeIf(tok::l_paren)) {      // Consume the ')'.
-
-      // While we don't have '->' or ')', eat balanced tokens.
-      while (!Tok.is(tok::r_paren) && !Tok.is(tok::eof))
-        skipSingle();
-
-      // Consume the ')', if it's there.
-      if (consumeIf(tok::r_paren)) {
-        consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
-        // Parse the func-signature-result, if present.
-        if (consumeIf(tok::arrow)) {
-          if (!canParseType())
-            return false;
-        }
-      }
-
-      // Okay, we have a closure signature.
-    } else if (Tok.isIdentifierOrUnderscore()) {
-      // Parse identifier (',' identifier)*
-      consumeToken();
-      while (consumeIf(tok::comma)) {
-        if (Tok.isIdentifierOrUnderscore()) {
-          consumeToken();
-          continue;
-        }
-
-        return false;
-      }
-      
-      consumeIf(tok::kw_throws) || consumeIf(tok::kw_rethrows);
-
-      // Parse the func-signature-result, if present.
-      if (consumeIf(tok::arrow)) {
-        if (!canParseType())
-          return false;
-      }
-    }
-    
-    // Parse the 'in' at the end.
-    if (Tok.isNot(tok::kw_in))
-      return false;
-
-    // Okay, we have a closure signature.
-  } else {
-    // No closure signature.
+  // Don't attempt to check parameter format here, because
+  // it would be properly diagnosed later.
+  if (!isStartOfValidClosureSignature(/*checkParams=*/false))
     return false;
-  }
+
   SyntaxParsingContext ClosureSigCtx(SyntaxContext, SyntaxKind::ClosureSignature);
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
     SyntaxParsingContext CaptureCtx(SyntaxContext,
@@ -2761,16 +2783,23 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
   return invalid;
 }
 
-ParserResult<Expr> Parser::parseExprClosure() {
-  assert(Tok.is(tok::l_brace) && "Not at a left brace?");
+ParserResult<Expr> Parser::parseExprClosure(bool hasBraces) {
   SyntaxParsingContext ClosureContext(SyntaxContext, SyntaxKind::ClosureExpr);
   // We may be parsing this closure expr in a matching pattern context.  If so,
   // reset our state to not be in a pattern for any recursive pattern parses.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
   T(InVarOrLetPattern, IVOLP_NotInVarOrLet);
-  
-  // Parse the opening left brace.
-  SourceLoc leftBrace = consumeToken();
+
+  SourceLoc leftBrace;
+  SourceLoc rightBrace;
+
+  if (hasBraces) {
+    assert(Tok.is(tok::l_brace) && "Not at a left brace?");
+    // Parse the opening left brace.
+    leftBrace = consumeToken();
+  } else {
+    leftBrace = Tok.getLoc();
+  }
 
   // Parse the closure-signature, if present.
   ParameterList *params = nullptr;
@@ -2822,12 +2851,36 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // Parse the body.
   SmallVector<ASTNode, 4> bodyElements;
   ParserStatus Status;
-  Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
+  if (hasBraces) {
+    Status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
+  } else {
+    // If body of a single expression closure is not an expression
+    // let's try to recover by parsing it as a body of a regular closure.
+    if (isStartOfDecl() || isStartOfStmt()) {
+      diagnose(leftBrace, diag::expected_expr);
+      Status |=
+          parseBraceItems(bodyElements, BraceItemListKind::BracelessClosure);
+      rightBrace = PreviousLoc;
+    } else {
+      auto result = parseExpr(diag::expected_expr);
 
-  // Parse the closing '}'.
-  SourceLoc rightBrace;
-  parseMatchingToken(tok::r_brace, rightBrace, diag::expected_closure_rbrace,
-                     leftBrace);
+      Status |= result;
+      // In case of brace elision, location of the right (omitted) brace
+      // coincides with the location of the end of the closure body.
+      if (auto *bodyExpr = result.getPtrOrNull()) {
+        bodyElements.push_back(bodyExpr);
+        rightBrace = bodyExpr->getEndLoc();
+      } else {
+        rightBrace = PreviousLoc;
+      }
+    }
+  }
+
+  if (hasBraces) {
+    // Parse the closing '}'.
+    parseMatchingToken(tok::r_brace, rightBrace, diag::expected_closure_rbrace,
+                       leftBrace);
+  }
 
   // If we didn't have any parameters, create a parameter list from the
   // anonymous closure arguments.
