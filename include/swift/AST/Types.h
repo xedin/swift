@@ -5224,8 +5224,12 @@ TypeVariableType : public TypeBase {
   TypeVariableType(const ASTContext &C, unsigned ID)
     : TypeBase(TypeKind::TypeVariable, &C,
                RecursiveTypeProperties::HasTypeVariable) {
-    // Note: the ID may overflow, but its only used for printing.
+    // Note: the ID may overflow (current limit is 2^20 - 1).
     Bits.TypeVariableType.ID = ID;
+    if (Bits.TypeVariableType.ID != ID) {
+      llvm::errs() << "Type variable id overflow";
+      abort();
+    }
   }
 
   class Implementation;
