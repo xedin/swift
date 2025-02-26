@@ -2269,6 +2269,61 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
       return true;
     }
 
+    bool mismatch(AnyFunctionType *firstType, AnyFunctionType *secondType,
+                  Type sugaredFirstType) {
+      // Mismatch on sendability could be okay if everything else matches.
+      if (firstType->isSendable() != secondType->isSendable()) {
+        auto firstExtInfo = firstType->getExtInfo();
+        auto secondExtInfo = secondType->getExtInfo();
+
+        // If the requirement is Sendable, it's always okay because
+        // having witnesses differ only on `@Sendable` is already
+        // ambiguous, for example:
+        //
+        // protocol P {
+        //   associatedtype T
+        //   func test(_: @Sendable (T) -> Void)
+        // }
+
+        // struct S : P {
+        //   func test(_: @Sendable (String) -> Void) {}
+        //   func test(_: (Int) -> Void) {}
+        // }
+        //
+        // This infers `T` as `Int` and `String`.
+        if (firstType->isSendable()) {
+          return match(
+              firstType->withExtInfo(secondExtInfo.withSendable(false)),
+              secondType);
+        }
+
+        // If it's a witness that is Sendable but requirement isn't
+        // let's only allow matches if the witness comes from ObjC
+        // as a very narrow fix to avoid introducing new ambiguities
+        // like this:
+        //
+        // protocol P {
+        //   associatedtype T
+        //   func test(_: (T) -> Void)
+        // }
+        //
+        // struct S : P {
+        //   func test(_: @Sendable (Int) -> Void) {}
+        //   func test(_: (Int) -> Void) {}
+        // }
+        //
+        // This currently infers `T := Int`.
+        if (auto *witness = Inferred.Witness) {
+          if (witness->hasClangNode()) {
+            return match(firstType, secondType->withExtInfo(
+                                        firstExtInfo.withSendable(false)));
+          }
+        }
+      }
+
+      return false;
+    }
+
     bool mismatch(GenericTypeParamType *selfParamType,
                   TypeBase *secondType, Type sugaredFirstType) {
       if (selfParamType->isEqual(Conformance->getProtocol()->getSelfInterfaceType())) {
