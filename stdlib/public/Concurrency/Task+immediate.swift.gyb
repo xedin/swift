@@ -43,6 +43,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   % elif FAILURE_TYPE == "Never":
   @_silgen_name("$sScTss5NeverORs_rlE18startSynchronously4name8priority_ScTyxABGSSSg_ScPSgxyYaKcntFZ")
   % end
+  @_alwaysEmitIntoClient
   @discardableResult
   public static func startSynchronously(
     name: String? = nil,
