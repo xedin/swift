@@ -621,6 +621,10 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(AlwaysUnsafeAttribute, 0, "@unsafe(always) attribu
 /// The Deinitable invertible protocol, which Copyable inherits
 SUPPRESSIBLE_LANGUAGE_FEATURE(DeinitableProtocol, 0, "Deinitable protocol")
 
+/// Add the Transferable invertible protocol to model non-Sendable values
+/// that cannot cross an isolation boundary unless consumed.
+SUPPRESSIBLE_LANGUAGE_FEATURE(TransferableProtocol, 0, "Transferable protocol")
+
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 
