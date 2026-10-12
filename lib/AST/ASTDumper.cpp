@@ -6965,6 +6965,9 @@ namespace {
         case InvertibleProtocolKind::Deinitable:
           printFlag("inverse_deinitable");
           break;
+        case InvertibleProtocolKind::Transferable:
+          printFlag("inverse_transferable");
+          break;
         }
       }
 

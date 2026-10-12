@@ -3757,13 +3757,6 @@ suppressingFeatureAlwaysUnsafeAttribute(PrintOptions &options,
   action();
 }
 
-static void
-suppressingFeatureTransferableProtocol(PrintOptions &options,
-                                       llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.SuppressTransferableProtocol, true);
-  action();
-}
-
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(const PrintOptions &_options, Feature feature,
                                llvm::function_ref<void()> action) {

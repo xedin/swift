@@ -429,6 +429,11 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
       break;
     case KnownProtocolKind::SendableMetatype:
       return synthesizeConformance();
+    case KnownProtocolKind::Transferable:
+      // FIXME: Not all of the function types are Transferable, it
+      //        depends on whether or not they capture any ~Transferable
+      //        values.
+      return synthesizeConformance();
     default:
       break;
     }
@@ -497,6 +502,7 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:
     case KnownProtocolKind::Deinitable:
+    case KnownProtocolKind::Transferable:
     case KnownProtocolKind::BitwiseCopyable:
     case KnownProtocolKind::SendableMetatype:
       return ProtocolConformanceRef(
@@ -521,7 +527,8 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
     case KnownProtocolKind::SendableMetatype:
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:
-    case KnownProtocolKind::Deinitable: {
+    case KnownProtocolKind::Deinitable:
+    case KnownProtocolKind::Transferable: {
       ASTContext &ctx = protocol->getASTContext();
 
       // FixedArray is Sendable, Copyable, or Escapable if its element type is.
@@ -558,8 +565,8 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
         }
       }
     
-      // All other builtin types are Sendable, SendableMetatype, Copyable, and
-      // Escapable.
+      // All other builtin types are Sendable, SendableMetatype, Copyable,
+      // Escapable, Deinitable and Transferable.
       return ProtocolConformanceRef(
           ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
@@ -1068,6 +1075,16 @@ bool TypeBase::isEscapable(GenericSignature sig) {
     contextTy = sig.getGenericEnvironment()->mapTypeIntoEnvironment(contextTy);
   }
   return contextTy->isEscapable();
+}
+
+bool TypeBase::isTransferable() {
+  Type type(this);
+  if (auto *pet = type->getAs<PackExpansionType>())
+    type = pet->getPatternType();
+  auto canType = type->getReferenceStorageReferent()
+                     ->getWithoutSpecifierType()
+                     ->getCanonicalType();
+  return conformsToInvertible(canType, InvertibleProtocolKind::Transferable);
 }
 
 bool TypeBase::isBitwiseCopyable() {

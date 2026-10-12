@@ -1464,6 +1464,9 @@ getFunctionTypeFlags(CanFunctionType type) {
         InvertedProtocols.insert(invertibleKind);
       break;
     }
+    case InvertibleProtocolKind::Transferable:
+      // FIXME: Function types always conform to Transferable for now.
+      break;
     }
   }
 

@@ -1306,6 +1306,12 @@ void NominalTypeDecl::prepareConformanceTable() const {
   bool hasSuppressedConformances = false;
   auto *classDecl = dyn_cast<ClassDecl>(this);
   for (auto ip : InvertibleProtocolSet::allKnown()) {
+    // A subclass is Transferable only through its superclass, so an upcast
+    // can't change whether a reference is Transferable.
+    if (classDecl && ip == InvertibleProtocolKind::Transferable &&
+        classDecl->hasSuperclass())
+      continue;
+
     if (!inverses.contains(ip) ||
         (classDecl && !classDecl->canSuppressInvertible(ip))) {
       addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));

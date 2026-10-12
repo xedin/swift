@@ -490,6 +490,9 @@ bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
 
     case InvertibleProtocolKind::Deinitable:
       break;
+
+    case InvertibleProtocolKind::Transferable:
+      break;
     }
 
     return false;

@@ -1700,6 +1700,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::Copyable:
   case KnownProtocolKind::Escapable:
   case KnownProtocolKind::Deinitable:
+  case KnownProtocolKind::Transferable:
     // If there's no stdlib, do qualified lookup in the Builtin module,
     // which will trigger the correct synthesis of the protocols in that module.
     M = getStdlibModule();
@@ -7886,6 +7887,9 @@ BuiltinTupleDecl *ASTContext::getBuiltinTupleDecl() {
     buildFakeExtension(proto);
 
   if (auto *proto = getProtocol(KnownProtocolKind::Deinitable))
+    buildFakeExtension(proto);
+
+  if (auto *proto = getProtocol(KnownProtocolKind::Transferable))
     buildFakeExtension(proto);
 
   if (auto *proto = getProtocol(KnownProtocolKind::BitwiseCopyable))

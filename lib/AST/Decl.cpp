@@ -7464,6 +7464,9 @@ bool ClassDecl::canSuppressInvertible(InvertibleProtocolKind ip) const {
   switch (ip) {
   case InvertibleProtocolKind::Copyable:
     return getASTContext().LangOpts.hasFeature(Feature::MoveOnlyClasses);
+  case InvertibleProtocolKind::Transferable:
+    // Actors are always Sendable, which implies Transferable.
+    return !isAnyActor();
   case InvertibleProtocolKind::Escapable:
   case InvertibleProtocolKind::Deinitable:
     return false;

@@ -2624,7 +2624,8 @@ static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
 static bool hasRuntimeConformanceInfo(ProtocolDecl *proto) {
   return !proto->isMarkerProtocol()
       || proto->isSpecificProtocol(KnownProtocolKind::Copyable)
-      || proto->isSpecificProtocol(KnownProtocolKind::Escapable);
+      || proto->isSpecificProtocol(KnownProtocolKind::Escapable)
+      || proto->isSpecificProtocol(KnownProtocolKind::Transferable);
 }
 
 static void diagnoseConformanceIsolationErrors(
@@ -7182,6 +7183,10 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
       case KnownProtocolKind::Deinitable: {
         checkDeinitableConformance(dc, ProtocolConformanceRef(conformance));
+        break;
+      }
+      case KnownProtocolKind::Transferable: {
+        checkTransferableConformance(dc, ProtocolConformanceRef(conformance));
         break;
       }
       case KnownProtocolKind::BitwiseCopyable: {
