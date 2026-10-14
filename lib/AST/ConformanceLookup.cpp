@@ -1041,6 +1041,9 @@ void TypeBase::computeInvertibleConformances() {
        InverseRequirement::copyableImpliesDeinitable(
            canType->getASTContext())) ||
       conformsToInvertible(canType, InvertibleProtocolKind::Deinitable);
+
+  Bits.TypeBase.IsTransferable =
+      conformsToInvertible(canType, InvertibleProtocolKind::Transferable);
 }
 
 /// \returns true iff this type lacks conformance to Copyable.
@@ -1078,13 +1081,9 @@ bool TypeBase::isEscapable(GenericSignature sig) {
 }
 
 bool TypeBase::isTransferable() {
-  Type type(this);
-  if (auto *pet = type->getAs<PackExpansionType>())
-    type = pet->getPatternType();
-  auto canType = type->getReferenceStorageReferent()
-                     ->getWithoutSpecifierType()
-                     ->getCanonicalType();
-  return conformsToInvertible(canType, InvertibleProtocolKind::Transferable);
+  if (!Bits.TypeBase.ComputedInvertibleConformances)
+    computeInvertibleConformances();
+  return Bits.TypeBase.IsTransferable;
 }
 
 bool TypeBase::isBitwiseCopyable() {
