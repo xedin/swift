@@ -471,6 +471,10 @@ public:
   /// clauses of protocols.
   bool SuppressDeinitableProtocol = false;
 
+  /// Suppress printing of Transferable and ~Transferable in the inheritance
+  /// clauses of protocols.
+  bool SuppressTransferableProtocol = false;
+
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
 

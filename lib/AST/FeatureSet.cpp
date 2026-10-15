@@ -873,7 +873,7 @@ static bool usesFeatureNondeinitableTypes(Decl *decl) {
 }
 
 namespace {
-/// Determines whether declarations depend on TransferableProtocol, either by
+/// Determines whether declarations depend on NontransferableTypes, either by
 /// naming or suppressing Transferable, or by referring to a declaration that
 /// does. Older compilers don't see such declarations at all.
 class TransferableUsage {
@@ -881,17 +881,11 @@ class TransferableUsage {
 
 public:
   bool declUses(Decl *decl) {
-    // The protocol is synthesized into the stdlib even without the feature.
-    if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-      if (isTransferable(proto))
-        return true;
-    }
-
     // Without the feature, `Transferable` can't be named, and a module that
     // only refers to declarations using it can't be guarded: `$` checks for
     // experimental features fail when the interface is built without them.
     auto &ctx = decl->getASTContext();
-    if (!ctx.LangOpts.hasFeature(Feature::TransferableProtocol))
+    if (!ctx.LangOpts.hasFeature(Feature::NontransferableTypes))
       return false;
 
     // Opaque type declarations aren't printed; the declaration naming one
@@ -1073,8 +1067,38 @@ private:
 };
 } // end anonymous namespace
 
-static bool usesFeatureTransferableProtocol(Decl *decl) {
+static bool usesFeatureNontransferableTypes(Decl *decl) {
   return TransferableUsage().declUses(decl);
+}
+
+static bool usesFeatureTransferableProtocol(Decl *decl) {
+  auto *proto = dyn_cast<ProtocolDecl>(decl);
+  if (!proto)
+    return false;
+
+  // The protocol is synthesized into the stdlib.
+  if (proto->isSpecificProtocol(KnownProtocolKind::Transferable))
+    return true;
+
+  // Elsewhere, naming or suppressing Transferable requires
+  // NontransferableTypes, which guards the declaration without a fallback.
+  if (!proto->getParentModule()->isStdlibModule())
+    return false;
+
+  // Sendable inherits Transferable, and SendableMetatype suppresses it.
+  InheritedTypes inherited(proto);
+  return llvm::any_of(inherited.getIndices(), [&](unsigned i) {
+    auto type = inherited.getResolvedType(i);
+    if (!type)
+      return false;
+    if (auto *inheritedProto = type->getAs<ProtocolType>())
+      if (inheritedProto->getDecl()->isSpecificProtocol(
+              KnownProtocolKind::Transferable))
+        return true;
+    if (auto *pct = type->getCanonicalType()->getAs<ProtocolCompositionType>())
+      return pct->getInverses().contains(InvertibleProtocolKind::Transferable);
+    return false;
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -1119,6 +1143,13 @@ static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
   if (featureName == "DeinitableProtocol") {
     if (auto *proto = dyn_cast<ProtocolDecl>(decl))
       if (proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
+        return true;
+  }
+
+  // Compilers without the Transferable protocol must not see it at all.
+  if (featureName == "TransferableProtocol") {
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl))
+      if (proto->isSpecificProtocol(KnownProtocolKind::Transferable))
         return true;
   }
 
