@@ -305,6 +305,7 @@ extension ASTGenVisitor {
         .NonEscapable,
         .NonObjC,
         .NonOverride,
+        .NonTransferable,
         .NSApplicationMain,
         .NSCopying,
         .NSManaged,

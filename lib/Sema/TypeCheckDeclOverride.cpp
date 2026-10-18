@@ -1720,6 +1720,7 @@ namespace  {
     UNINTERESTING_ATTR(NonEphemeral)
     UNINTERESTING_ATTR(NonObjC)
     UNINTERESTING_ATTR(NonOverride)
+    UNINTERESTING_ATTR(NonTransferable)
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)

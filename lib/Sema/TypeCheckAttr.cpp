@@ -555,6 +555,8 @@ public:
   void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
 
   void visitCoroutineAttr(CoroutineAttr *attr);
+
+  void visitNonTransferableAttr(NonTransferableAttr *attr);
 };
 
 } // end anonymous namespace
@@ -9375,6 +9377,15 @@ void AttributeChecker::visitUnsafeSelfDependentResultAttr(
                      diag::unsafe_self_dependent_result_attr_on_invalid_decl);
 }
 
+void AttributeChecker::visitNonTransferableAttr(NonTransferableAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::NontransferableTypes)) {
+    diagnoseAndRemoveAttr(attr, diag::requires_experimental_feature,
+                          "@nontransferable", false,
+                          Feature::NontransferableTypes.getName());
+    return;
+  }
+}
+
 namespace {
 
 class ClosureAttributeChecker
@@ -9458,6 +9469,16 @@ public:
 
   void visitCallableAttr(CallableAttr *attr) {
     checkExecutionSemanticsAttr(attr);
+  }
+
+  void visitNonTransferableAttr(NonTransferableAttr *attr) {
+    if (auto *sendable = closure->getAttrs().getAttribute<SendableAttr>()) {
+      ctx.Diags.diagnose(
+          sendable->getLocation(),
+          diag::invalid_use_of_nontransferable_and_sendable_attributes);
+      attr->setInvalid();
+      return;
+    }
   }
 
   void visitCustomAttr(CustomAttr *attr) {
