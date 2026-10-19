@@ -420,7 +420,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 19 };
+  enum { NumAFTExtInfoBits = 20 };
   enum { NumSILExtInfoBits = 17 };
 
   // clang-format off
@@ -4088,6 +4088,12 @@ public:
   /// once, which is true only for exactly-once function types.
   bool isCalledOnce() const {
     return getExecutionSemantics() == ExecutionSemantics::Once;
+  }
+
+  /// Returns true if values of this function type cannot cross an isolation
+  /// boundary without also being consumed.
+  bool isNonTransferable() const {
+    return hasExtInfo() && getExtInfo().isNonTransferable();
   }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
