@@ -4173,6 +4173,9 @@ public:
   /// at-most-once and exactly-once closures.
   bool hasCalledAtMostOnceSemantics() const;
 
+  /// Whether this closure is ~Transferable.
+  bool isNonTransferable() const;
+
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 
