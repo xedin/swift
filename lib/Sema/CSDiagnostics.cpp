@@ -749,9 +749,11 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
   if (auto protoType = protocolType->getAs<ProtocolType>()) {
     auto *protoDecl = protoType->getDecl();
     if (protoDecl->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      if (nonConformingType->is<FunctionType>()) {
-        emitDiagnostic(diag::nonsendable_function_type);
-        emittedSpecializedNote = true;
+      if (auto *funcType = nonConformingType->getAs<FunctionType>()) {
+        if (funcType->isTransferable()) {
+          emitDiagnostic(diag::nonsendable_function_type);
+          emittedSpecializedNote = true;
+        }
       } else if (nonConformingType->is<TupleType>()) {
         emitDiagnostic(diag::nonsendable_tuple_type);
         emittedSpecializedNote = true;
@@ -7632,6 +7634,12 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
   }
 
   emitDiagnostic(diag::async_functiontype_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
+bool NonTransferableFunctionConversionFailure::diagnoseAsError() {
+  emitDiagnostic(diag::non_transferable_functiontype_mismatch, getFromType(),
                  getToType());
   return true;
 }

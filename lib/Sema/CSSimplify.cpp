@@ -3327,7 +3327,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   if (func1->isNonTransferable() != func2->isNonTransferable() &&
       (func1->isNonTransferable() || kind < ConstraintKind::Subtype)) {
-    return SolutionKind::Error;
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    auto *fix = DropNonTransferableAttribute::create(
+        *this, func1, func2, getConstraintLocator(locator));
+    if (recordFix(fix, FixImpact::FunctionTypeMismatch))
+      return SolutionKind::Error;
   }
 
   // () -> sending T can be a subtype of () -> T... but not vis-a-versa.
@@ -16480,6 +16486,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddSendableAttribute:
   case FixKind::DropThrowsAttribute:
   case FixKind::DropAsyncAttribute:
+  case FixKind::DropNonTransferableAttribute:
   case FixKind::AllowSwiftToCPointerConversion:
   case FixKind::AllowTupleLabelMismatch:
   case FixKind::AddExplicitExistentialCoercion:
