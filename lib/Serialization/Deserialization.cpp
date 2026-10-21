@@ -8694,6 +8694,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   bool pseudogeneric = false;
   bool unimplementable;
   bool sendable;
+  bool nontransferable;
   bool noescape;
   uint8_t rawExecutionSemantics;
   uint8_t rawIsolation;
@@ -8708,7 +8709,8 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   ClangTypeID clangFunctionTypeID;
 
   decls_block::SILFunctionTypeLayout::readRecord(
-      scratch, sendable, async, rawCoroutineKind, rawCalleeConvention,
+      scratch, sendable, nontransferable, async, rawCoroutineKind,
+      rawCalleeConvention,
       rawRepresentation, pseudogeneric, noescape, unimplementable,
       rawExecutionSemantics, rawIsolation, rawDiffKind, hasErrorResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
@@ -8742,8 +8744,9 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
     return MF.diagnoseFatal();
 
   auto extInfo = SILFunctionType::ExtInfoBuilder(
-                     *representation, pseudogeneric, noescape, sendable, async,
-                     unimplementable, *executionSemantics, *isolation,
+                     *representation, pseudogeneric, noescape, sendable,
+                     nontransferable, async, unimplementable,
+                     *executionSemantics, *isolation,
                      *diffKind, clangFunctionType,
                      /*LifetimeDependenceInfo*/ {})
                      .build();

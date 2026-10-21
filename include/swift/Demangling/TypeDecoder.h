@@ -341,24 +341,27 @@ class ImplFunctionTypeFlags {
   unsigned DifferentiabilityKind : 3;
   unsigned HasSendingResult : 1;
   unsigned ExecutionSemantics : 2;
+  unsigned NonTransferable : 1;
 
 public:
   ImplFunctionTypeFlags()
       : Rep(0), Pseudogeneric(0), Escaping(0), Concurrent(0), Async(0),
         Isolation(0), DifferentiabilityKind(0), HasSendingResult(0),
-        ExecutionSemantics(0) {}
+        ExecutionSemantics(0), NonTransferable(0) {}
 
   ImplFunctionTypeFlags(ImplFunctionRepresentation rep, bool pseudogeneric,
                         bool noescape, bool concurrent, bool async,
                         ImplFunctionIsolation isolation,
                         ImplFunctionDifferentiabilityKind diffKind,
                         bool hasSendingResult,
-                        ImplFunctionExecutionSemantics executionSemantics)
+                        ImplFunctionExecutionSemantics executionSemantics,
+                        bool nonTransferable)
       : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape),
         Concurrent(concurrent), Async(async), Isolation(unsigned(isolation)),
         DifferentiabilityKind(unsigned(diffKind)),
         HasSendingResult(hasSendingResult),
-        ExecutionSemantics(unsigned(executionSemantics)) {}
+        ExecutionSemantics(unsigned(executionSemantics)),
+        NonTransferable(nonTransferable) {}
 
   ImplFunctionTypeFlags
   withRepresentation(ImplFunctionRepresentation rep) const {
@@ -366,7 +369,8 @@ public:
         rep, Pseudogeneric, Escaping, Concurrent, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics),
+        NonTransferable);
   }
 
   ImplFunctionTypeFlags
@@ -375,7 +379,8 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, true, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics),
+        NonTransferable);
   }
 
   ImplFunctionTypeFlags
@@ -384,7 +389,8 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         true, ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics),
+        NonTransferable);
   }
 
   ImplFunctionTypeFlags
@@ -393,7 +399,8 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, true, Concurrent, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics),
+        NonTransferable);
   }
 
   ImplFunctionTypeFlags
@@ -402,7 +409,8 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation::Erased,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics),
+        NonTransferable);
   }
 
   ImplFunctionTypeFlags withNonisolatedNonsendingIsolation() const {
@@ -410,7 +418,8 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation::NonisolatedNonsending,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics),
+        NonTransferable);
   }
 
   ImplFunctionTypeFlags
@@ -419,7 +428,8 @@ public:
         ImplFunctionRepresentation(Rep), true, Escaping, Concurrent, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics));
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics),
+        NonTransferable);
   }
 
   ImplFunctionTypeFlags
@@ -427,7 +437,7 @@ public:
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation(Isolation), diffKind, HasSendingResult,
-        ImplFunctionExecutionSemantics(ExecutionSemantics));
+        ImplFunctionExecutionSemantics(ExecutionSemantics), NonTransferable);
   }
 
   ImplFunctionTypeFlags withSendingResult() const {
@@ -435,7 +445,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind), true,
-        ImplFunctionExecutionSemantics(ExecutionSemantics));
+        ImplFunctionExecutionSemantics(ExecutionSemantics), NonTransferable);
   }
 
   ImplFunctionTypeFlags
@@ -444,7 +454,16 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult, semantics);
+        HasSendingResult, semantics, NonTransferable);
+  }
+
+  ImplFunctionTypeFlags withNonTransferable() const {
+    return ImplFunctionTypeFlags(
+        ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
+        Async, ImplFunctionIsolation(Isolation),
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
+        HasSendingResult, ImplFunctionExecutionSemantics(ExecutionSemantics),
+        true);
   }
 
   ImplFunctionRepresentation getRepresentation() const {
@@ -456,6 +475,8 @@ public:
   bool isEscaping() const { return Escaping; }
 
   bool isSendable() const { return Concurrent; }
+
+  bool isNonTransferable() const { return NonTransferable; }
 
   bool isPseudogeneric() const { return Pseudogeneric; }
 
@@ -1288,6 +1309,8 @@ protected:
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
           if (child->getText() == "@Sendable") {
             flags = flags.withSendable();
+          } else if (child->getText() == "@nontransferable") {
+            flags = flags.withNonTransferable();
           } else if (child->getText() == "@async") {
             flags = flags.withAsync();
           } else if (child->getText() == "sending-result") {

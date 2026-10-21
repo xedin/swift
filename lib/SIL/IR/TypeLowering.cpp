@@ -4653,6 +4653,7 @@ getAnyFunctionRefInterfaceType(TypeConverter &TC,
                                       funcType->isThrowing(),
                                       funcType->getThrownError())
           .withSendable(funcType->isSendable())
+          .withNonTransferable(funcType->isNonTransferable())
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
           .withLifetimeDependencies(funcType->getLifetimeDependencies())
