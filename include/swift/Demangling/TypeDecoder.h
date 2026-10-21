@@ -1165,6 +1165,14 @@ protected:
         extFlags = extFlags.withTypedThrows(true);
       }
 
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::NonTransferableFunctionType) {
+        auto inverted = extFlags.getInvertedProtocols();
+        inverted.insert(InvertibleProtocolKind::Transferable);
+        extFlags = extFlags.withInvertedProtocols(inverted);
+        ++firstChildIdx;
+      }
+
       bool isSendable = false;
       if (Node->getChild(firstChildIdx)->getKind()
             == NodeKind::ConcurrentFunctionType) {

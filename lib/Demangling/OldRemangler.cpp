@@ -3220,3 +3220,8 @@ ManglingError Remangler::mangleCalledAtMostOnceFunctionType(Node *node,
                                                             unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
+
+ManglingError Remangler::mangleNonTransferableFunctionType(Node *node,
+                                                           unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}

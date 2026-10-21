@@ -1082,6 +1082,8 @@ NodePointer Demangler::demangleTypeAnnotation() {
         Node::Kind::GlobalActorFunctionType, popTypeAndGetChild());
   case 'C':
     return createNode(Node::Kind::NonIsolatedCallerFunctionType);
+  case 'd':
+    return createNode(Node::Kind::NonTransferableFunctionType);
   case 'i':
     return createType(
         createWithChild(Node::Kind::Isolated, popTypeAndGetChild()));
@@ -1784,6 +1786,9 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
       kind == Node::Kind::TypedThrowsAnnotation;
   }));
 
+  // nontransferable?
+  addChild(FuncType, popNode(Node::Kind::NonTransferableFunctionType));
+
   // sendable?
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
 
@@ -1849,6 +1854,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
         == Node::Kind::ThrowsAnnotation ||
       FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::TypedThrowsAnnotation)
+    ++FirstChildIdx;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::NonTransferableFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::ConcurrentFunctionType)
