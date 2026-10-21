@@ -67,6 +67,9 @@ class FindCapturedVars : public ASTWalker {
   /// The values whose consumed captures were diagnosed because this closure
   /// can't own them.
   llvm::SmallPtrSet<ValueDecl *, 1> DiagnosedOwnedCaptures;
+  /// The non-Transferable values whose captures were diagnosed because this
+  /// Transferable closure can't capture them.
+  llvm::SmallPtrSet<ValueDecl *, 1> DiagnosedNonTransferableCaptures;
 
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
@@ -74,7 +77,7 @@ class FindCapturedVars : public ASTWalker {
   OpaqueValueExpr *OpaqueValue = nullptr;
   SourceLoc CaptureLoc;
   DeclContext *CurDC;
-  bool NoEscape, ObjC, HasCalledAtMostOnceSemantics;
+  bool NoEscape, NonTransferable, ObjC, HasCalledAtMostOnceSemantics;
   /// Whether this function can be destroyed without running, which is true
   /// for every function except an exactly-once closure.
   bool IsDeinitable;
@@ -85,10 +88,10 @@ class FindCapturedVars : public ASTWalker {
 
 public:
   FindCapturedVars(SourceLoc CaptureLoc, DeclContext *CurDC, bool NoEscape,
-                   bool ObjC, bool IsGenericFunction,
+                   bool NonTransferable, bool ObjC, bool IsGenericFunction,
                    bool HasCalledAtMostOnceSemantics, bool IsDeinitable = true)
       : Context(CurDC->getASTContext()), CaptureLoc(CaptureLoc), CurDC(CurDC),
-        NoEscape(NoEscape), ObjC(ObjC),
+        NoEscape(NoEscape), NonTransferable(NonTransferable), ObjC(ObjC),
         HasCalledAtMostOnceSemantics(HasCalledAtMostOnceSemantics),
         IsDeinitable(IsDeinitable), HasGenericParamCaptures(IsGenericFunction) {
   }
@@ -282,6 +285,7 @@ public:
     }
 
     checkOwnedCapture(capture);
+    checkCaptureTransferability(capture);
 
     // Visit the type of the capture, if it isn't a class reference, since
     // we'd need the metadata to do so.
@@ -485,6 +489,35 @@ public:
       Context.Diags.diagnose(capture.getLoc(),
                              diag::deinitable_closure_nondeinitable_capture,
                              /*captureList=*/0, var, type);
+    }
+  }
+
+  /// A Transferable closure cannot capture non-Transferable values.
+  void checkCaptureTransferability(const CapturedValue &capture) {
+    // ~Transferable closure can capture both Transferable and ~Transferable
+    // values.
+    if (NonTransferable)
+      return;
+
+    // Capture list entries are diagnosed where they're declared.
+    auto *var = dyn_cast_or_null<VarDecl>(capture.getDecl());
+    if (!var || !var->hasInterfaceType())
+      return;
+
+    // The owning closure's capture list entries are diagnosed separately.
+    if (auto *captureList = var->getParentCaptureList()) {
+      if (captureList->getClosureBody() == CurDC)
+        return;
+    }
+
+    auto type = var->getTypeInContext();
+    if (type->hasError() || type->isTransferable())
+      return;
+
+    if (DiagnosedNonTransferableCaptures.insert(var).second) {
+      Context.Diags.diagnose(
+          capture.getLoc(),
+          diag::non_transferable_capture_in_transferable_closure, var);
     }
   }
 
@@ -1033,9 +1066,10 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   auto fnType = type->castTo<AnyFunctionType>();
   bool isNoEscape = fnType->isNoEscape();
+  bool isNonTransferable = fnType->isNonTransferable();
   bool hasCalledAtMostOnceSemantics = fnType->hasCalledAtMostOnceSemantics();
-  FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape, AFD->isObjC(),
-                          AFD->hasGenericParamList(),
+  FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape, isNonTransferable,
+                          AFD->isObjC(), AFD->hasGenericParamList(),
                           hasCalledAtMostOnceSemantics);
 
   if (auto *body = AFD->getTypecheckedBody())
@@ -1114,8 +1148,9 @@ void TypeChecker::computeCaptures(AbstractClosureExpr *ACE) {
 
   auto fnType = type->castTo<FunctionType>();
   bool isNoEscape = fnType->isNoEscape();
+  bool isNonTransferable = fnType->isNonTransferable();
   bool hasCalledAtMostOnceSemantics = fnType->hasCalledAtMostOnceSemantics();
-  FindCapturedVars finder(ACE->getLoc(), ACE, isNoEscape,
+  FindCapturedVars finder(ACE->getLoc(), ACE, isNoEscape, isNonTransferable,
                           /*isObjC=*/false, /*isGeneric=*/false,
                           hasCalledAtMostOnceSemantics, fnType->isDeinitable());
   body->walk(finder);
@@ -1138,12 +1173,14 @@ CaptureInfo ParamCaptureInfoRequest::evaluate(Evaluator &evaluator,
   bool isGeneric = DC->isInnermostContextGeneric();
 
   bool hasCalledAtMostOnceSemantics = false;
+  bool isNonTransferable = false;
   if (auto *closure = dyn_cast<AbstractClosureExpr>(E)) {
     hasCalledAtMostOnceSemantics = closure->hasCalledAtMostOnceSemantics();
+    isNonTransferable = closure->isNonTransferable();
   }
 
   FindCapturedVars finder(E->getLoc(), DC,
-                          /*isNoEscape=*/false,
+                          /*isNoEscape=*/false, isNonTransferable,
                           /*isObjC=*/false,
                           /*IsGeneric*/ isGeneric,
                           hasCalledAtMostOnceSemantics);
@@ -1173,6 +1210,7 @@ CaptureInfo PatternBindingCaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   FindCapturedVars finder(init->getLoc(), DC,
                           /*NoEscape=*/false,
+                          /*NonTransferable=*/false,
                           /*ObjC=*/false,
                           /*IsGenericFunction*/ false,
                           /*HasCalledAtMostOnceSemantics=*/false);
